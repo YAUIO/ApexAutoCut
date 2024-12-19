@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
     for (auto const& vidf : vec) {
         fmt::println("Processing {}",vidf.path().filename().generic_string());
 
-        auto killTime = Detection::findKillFrame(vidf.path().generic_string(),tess,16);
+        auto killTime = Detection::findKillFrame(vidf.path().generic_string(),tess,32);
 
         if (killTime == 0) {
             continue;
