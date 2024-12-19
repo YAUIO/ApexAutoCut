@@ -1,15 +1,11 @@
 #include "Detection.h"
 
-bool Detection::detectKnock(cv::Mat const& frame, tesseract::TessBaseAPI & tess) {
+bool Detection::detectKnock(int const &x, int const &y, int const &width, int const &height, cv::Mat const &frame,
+                            tesseract::TessBaseAPI &tess, tesseract::TessBaseAPI &tessRUS) {
     if (frame.empty()) {
         std::cerr << "Error: Cannot read frame image!" << std::endl;
         return false;
     }
-
-    int x = 660;
-    int y = 760;
-    int width = 600;
-    int height = 60;
 
     cv::Rect roi(x, y, width, height);
     cv::Mat cropped = frame(roi);
@@ -25,14 +21,23 @@ bool Detection::detectKnock(cv::Mat const& frame, tesseract::TessBaseAPI & tess)
         return true;
     }
 
+    tessRUS.SetImage(gray.data, gray.cols, gray.rows, 1, gray.step);
+
+    text = tessRUS.GetUTF8Text();
+
+    if (text.find("НОКАУТ") != std::string::npos) {
+        return true;
+    }
+
     return false;
 }
 
-void Detection::render(double const &offsetMinus, double const &offsetPlus, double const &firstOccurence, std::filesystem::directory_entry const& src, std::string const& outPath) {
+void Detection::render(double const &offsetMinus, double const &offsetPlus, double const &firstOccurence,
+                       std::filesystem::directory_entry const &src, std::string const &outPath) {
     std::string command = "ffmpeg -i \"" + src.path().generic_string() + "\" -ss "
-                            + std::to_string(firstOccurence-offsetMinus)
-                            +  " -to " + std::to_string(firstOccurence+offsetPlus)
-                            +  " -c:v libx264 -c:a aac \"" +
+                          + std::to_string(firstOccurence - offsetMinus)
+                          + " -to " + std::to_string(firstOccurence + offsetPlus)
+                          + " -c:v libx264 -c:a aac \"" +
                           outPath + "output_" + src.path().filename().generic_string() + ".mp4\"";
 
     fmt::println("{}", command);
@@ -40,7 +45,9 @@ void Detection::render(double const &offsetMinus, double const &offsetPlus, doub
     system(command.c_str());
 }
 
-double Detection::findKillFrame(std::string const &pathToVideo, tesseract::TessBaseAPI & tess, int const& skip) {
+double Detection::findKillFrame(int const &x, int const &y, int const &width, int const &height,
+                                std::string const &pathToVideo, tesseract::TessBaseAPI &tess,
+                                tesseract::TessBaseAPI &tessRUS, int const &skip) {
     cv::VideoCapture capture(pathToVideo);
 
     if (!capture.isOpened()) {
@@ -63,8 +70,8 @@ double Detection::findKillFrame(std::string const &pathToVideo, tesseract::TessB
             break;
         }
 
-        if (Detection::detectKnock(frame, tess)) {
-            firstOccurence = capture.get(cv::CAP_PROP_POS_MSEC)/1000;
+        if (Detection::detectKnock(x, y, width, height, frame, tess, tessRUS)) {
+            firstOccurence = capture.get(cv::CAP_PROP_POS_MSEC) / 1000;
             break;
         }
     }
@@ -74,19 +81,20 @@ double Detection::findKillFrame(std::string const &pathToVideo, tesseract::TessB
     return firstOccurence;
 }
 
-void Detection::getVideos(std::vector<std::filesystem::directory_entry> & out, std::filesystem::directory_entry const &savedir, std::string const &rootPath) {
-    for (auto const& e : std::filesystem::directory_iterator(rootPath)) {
+void Detection::getVideos(std::vector <std::filesystem::directory_entry> &out,
+                          std::filesystem::directory_entry const &savedir, std::string const &rootPath) {
+    for (auto const &e: std::filesystem::directory_iterator(rootPath)) {
         if (e.is_directory()) {
             if (e.path() == savedir.path()) {
                 continue;
             }
 
-            for (auto const& ie : std::filesystem::directory_iterator(e)) {
+            for (auto const &ie: std::filesystem::directory_iterator(e)) {
                 if (!ie.is_directory() && ie.path().extension() == ".mp4") {
                     out.push_back(ie);
                 }
             }
-        } else if (e.path().extension() == ".mp4"){
+        } else if (e.path().extension() == ".mp4") {
             out.push_back(e);
         }
     }
