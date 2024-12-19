@@ -28,7 +28,7 @@ bool Detection::detectKnock(cv::Mat const& frame, tesseract::TessBaseAPI & tess)
     return false;
 }
 
-void Detection::render(int const &offsetMinus, int const &offsetPlus, double const &firstOccurence, std::filesystem::directory_entry const& src, std::string const& outPath) {
+void Detection::render(double const &offsetMinus, double const &offsetPlus, double const &firstOccurence, std::filesystem::directory_entry const& src, std::string const& outPath) {
     std::string command = "ffmpeg -i \"" + src.path().generic_string() + "\" -ss "
                             + std::to_string(firstOccurence-offsetMinus)
                             +  " -to " + std::to_string(firstOccurence+offsetPlus)
