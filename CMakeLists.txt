@@ -3,7 +3,6 @@ project(ApexAutoCut)
 
 set(CMAKE_CXX_STANDARD 23)
 
-
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 

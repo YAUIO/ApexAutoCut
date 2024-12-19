@@ -2,63 +2,47 @@
 #include <tesseract/baseapi.h>
 #include <fmt/core.h>
 #include <iostream>
-#include <thread>
+#include <filesystem>
 
 #include "Detection.h"
 
-int main() {
-    cv::VideoCapture capture("/home/yudek/Documents/CLionProjects/ApexAutoCut/data/1.mp4");
-
-    if (!capture.isOpened()) {
-        std::cerr << "Error: Cannot open video file!" << std::endl;
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        fmt::println("Usage: ApexAutoCut <rootPath>");
         return -1;
     }
+
+    std::string rootPath = argv[1];
 
     tesseract::TessBaseAPI tess;
 
     if (tess.Init(nullptr, "eng", tesseract::OEM_LSTM_ONLY)) {
         std::cerr << "Error: Could not initialize tesseract." << std::endl;
-        return -1;
+        return {};
     }
 
-    cv::Mat frame;
-    int frameCount = 0;
-    int skip = 32;
+    auto vec = std::vector<std::filesystem::directory_entry>();
 
-    double firstOccurence = 0;
-
-    while (true) {
-        for (int s = 0; s < skip; s++) {
-            capture >> frame;
-            frameCount++;
-        }
-
-        if (frame.empty()) {
-            break;
-        }
-
-        if (Detection::detectKnock(frame, tess)) {
-            firstOccurence = capture.get(cv::CAP_PROP_POS_MSEC);
-            break;
-        }
+    auto savedir = std::filesystem::directory_entry("/home/yudek/Documents/CLionProjects/ApexAutoCut/data/out/");
+    if (!savedir.exists()) {
+        create_directory(savedir);
     }
 
-    firstOccurence = firstOccurence/1000;
+    Detection::getVideos(vec,savedir,rootPath);
 
-    fmt::println("Detected kill at frame {}, time {}s",frameCount,firstOccurence);
+    for (auto const& vidf : vec) {
+        fmt::println("Processing {}",vidf.path().filename().generic_string());
 
-    std::string command = "ffmpeg -i /home/yudek/Documents/CLionProjects/ApexAutoCut/data/1.mp4 -ss "
-                            + std::to_string(firstOccurence-4)
-                            +  " -to " + std::to_string(firstOccurence+2)
-                            +  " -c:v libx264 -c:a aac " +
-                          "/home/yudek/Documents/CLionProjects/ApexAutoCut/data/output_" + std::to_string(frameCount) + ".mp4";
+        auto killTime = Detection::findKillFrame(vidf.path().generic_string(),tess,16);
 
-    fmt::println("{}", command);
+        if (killTime == 0) {
+            continue;
+        }
 
-    // Execute FFmpeg command
-    system(command.c_str());
+        fmt::println("Detected kill at {}s",killTime);
+        Detection::render(4,2,killTime,vidf,savedir.path().generic_string());
+    }
 
-    capture.release();
     tess.End();
     cv::destroyAllWindows();
     return 0;
